@@ -6,8 +6,9 @@
 overflow via `kqueueex`) from the luac0re (lua-loader) host to
 [Y2JB](https://github.com/Gezine/Y2JB) (YouTube / V8 JavaScript host).
 
-Confirmed working: jailbreak end-to-end + debug menu + USB-loaded
-`elfldr_1320` + persistent unpatcher delivery.
+Confirmed working: jailbreak end-to-end + debug menu + ELF loader
+(`elfldr_1320`, loaded via the Y2JB 1.4 `kexp` shellcode) + persistent
+unpatcher delivery.
 
 > ⚠️ **Status — work in progress.** The in-memory jailbreak completes
 > reliably, but **closing the YouTube host app after `=== p2jb complete ===`
@@ -29,8 +30,9 @@ Confirmed working: jailbreak end-to-end + debug menu + USB-loaded
 The payload triggers a 32-bit `cr_ref` overflow in the PS5 kernel
 (via ~2³² `kqueueex` syscalls, ~50 minutes), uses the resulting
 use-after-free to build a kernel read/write primitive, escalates the
-host process to root, enables the debug menu, and loads
-`elfldr_1320` from USB — exposing a remote ELF loader on TCP `:9021`.
+host process to root, enables the debug menu, and hands off to the
+Y2JB 1.4 `kexp` shellcode — which loads `elfldr_1320` and exposes a
+remote ELF loader on TCP `:9021`.
 
 ---
 
@@ -46,11 +48,18 @@ for the backup file and the restore procedure. Without Y2JB
 restored and the YouTube TV app launched, the PS5 has no listener
 for the payload and nothing will happen.
 
+**Y2JB 1.4 or newer is required.** The ELF-loader handoff uses the
+`kexp` shellcode (and `elfldr_1320`), both shipped inside Y2JB as of
+version 1.4. On an older Y2JB the jailbreak still completes but the
+ELF-loader stage is skipped.
+
 ### Hardware
 
 - PlayStation 5 console running firmware **9.00 – 12.40** (tested on 11.60).
-- A USB flash drive formatted FAT32 or exFAT.
 - A PC on the same LAN as the PS5.
+
+No USB drive is needed — `kexp` and `elfldr_1320` are loaded from the
+Y2JB framework's own files on the console.
 
 ### Software (on PC)
 
@@ -62,20 +71,12 @@ for the payload and nothing will happen.
 ### Files
 
 - `p2jb.js` — the jailbreak payload (this repo).
-- `elfldr_1320.elf` — included in this repo for convenience. Binary by
-  Gezine.
 
 ---
 
 ## Usage
 
-### 1. Prepare the USB drive
-
-Copy `elfldr_1320.elf` to the root of your USB drive (FAT32 or exFAT),
-exactly as `/elfldr_1320.elf`. Plug it into the PS5 before launching
-the payload.
-
-### 2. Send the payload
+### 1. Send the payload
 
 From the PC:
 
@@ -91,9 +92,9 @@ quieter. **The rest of the run is much more likely to complete when
 `master` is 34 or less**; higher values empirically correlate with
 kernel panics later on. If `master` is above 34, close YouTube
 (Options → Close application), reopen it, wait longer this time, and
-retry from step 2.
+retry from step 1.
 
-### 3. Wait ~50 minutes
+### 2. Wait ~50 minutes
 
 The cr_ref leak dominates the runtime. The payload sender will stay
 silent for the whole leak — no per-percentage progress is printed.
@@ -101,7 +102,7 @@ Don't assume it has crashed; the worker is internally checked for
 liveness and a stall would surface as a `FATAL` log line. Do not
 interact with the PS5 while it runs.
 
-### 4. Look for completion
+### 3. Look for completion
 
 ```
 [p2jb] stage_elfldr: daemon should be listening on :9021
@@ -166,7 +167,9 @@ along the way.
   [Luac0re](https://github.com/Gezine/Luac0re).
 - **Y2JB userland framework** — Gezine.
   [Y2JB](https://github.com/Gezine/Y2JB).
-- **`elfldr_1320`** — Gezine (ELF loader binary).
+- **`elfldr_1320`** — ELF loader binary by Gezine, shipped inside Y2JB.
+- **`kexp` post-jailbreak all-in-one shellcode** — ufm42
+  ([kexp](https://github.com/ufm42/kexp)), merged into Y2JB 1.4.
 - **`notmaj0r` remote_lua_loader p2jb port** — used as a secondary
   reference during the port.
 - **`BD-UN-JB` persistent unpatcher** — Gezine.
