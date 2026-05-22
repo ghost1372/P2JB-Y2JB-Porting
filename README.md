@@ -142,7 +142,7 @@ and refer to BD-UN-JB's own documentation for the rest.
   to refuse re-runs without a reboot — the triple-free is a point of
   no return.
 - **YouTube app must stay open** until your persistent payload (if any)
-  has applied. `elfldr` is a daemon thread inside the YouTube process.
+  has applied.
 
 ---
 
