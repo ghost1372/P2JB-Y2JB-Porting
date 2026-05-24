@@ -6,8 +6,8 @@
 overflow via `kqueueex`) from the luac0re (lua-loader) host to
 [Y2JB](https://github.com/Gezine/Y2JB) (YouTube / V8 JavaScript host).
 
-Confirmed working: jailbreak end-to-end + debug menu + Y2JB's ELF
-loader (started automatically via the `kexp` shellcode) + persistent
+Confirmed working: jailbreak end-to-end + GPU-DMA debug menu + ELF
+loader (started automatically from the Y2JB sandbox) + persistent
 unpatcher delivery. Closing the YouTube host app after completion no
 longer kernel-panics the console.
 
@@ -20,9 +20,10 @@ longer kernel-panics the console.
 The payload triggers a 32-bit `cr_ref` overflow in the PS5 kernel
 (via ~2³² `kqueueex` syscalls, ~50 minutes), uses the resulting
 use-after-free to build a kernel read/write primitive, escalates the
-host process to root, enables the debug menu, and hands off to the
-Y2JB 1.4 `kexp` shellcode — which starts the ELF loader and exposes
-it on TCP `:9021`.
+host process to root, enables the Debug Settings menu via GPU DMA
+writes on the read-only kernel `.data` segment, then reads
+`elfldr_1320_v5.elf` from the Y2JB sandbox and spawns it as a new
+thread — exposing a remote ELF loader on TCP `:9021`.
 
 ---
 
@@ -38,18 +39,19 @@ for the backup file and the restore procedure. Without Y2JB
 restored and the YouTube TV app launched, the PS5 has no listener
 for the payload and nothing will happen.
 
-**Y2JB 1.4 or newer is required.** The ELF-loader handoff uses the
-`kexp` shellcode, shipped inside Y2JB as of version 1.4. The payload
-checks for it at the very start: on an older Y2JB it aborts before
-touching the kernel (no leak, no stage 0) and prompts you to update.
+**Y2JB 1.3 or newer.** The payload reads the bundled ELF loader
+(`elfldr_1320_v5.elf` on 1.4, `elfldr.elf` on 1.3) directly from the
+sandbox slot. The payload checks at the very start that the framework
+helpers it needs are in scope: if anything is missing it aborts before
+touching the kernel (no leak, no stage 0).
 
 ### Hardware
 
 - PlayStation 5 console running firmware **9.00 – 12.40**.
 - A PC on the same LAN as the PS5.
 
-No USB drive is needed — `kexp` and the ELF loader ship inside Y2JB
-on the console.
+No USB drive is needed — the ELF loader ships inside Y2JB on the
+console; the payload reads it directly from the sandbox.
 
 ### Software (on PC)
 
@@ -76,14 +78,6 @@ python payload_sender.py <ps5-ip> p2jb.js
 
 The payload streams its log back to `payload_sender.py`'s console.
 
-The first number (`master`) is a fingerprint of how busy YouTube is at
-that moment: lower means the app has fewer fds open and the host is
-quieter. **The rest of the run is much more likely to complete when
-`master` is 34 or less**; higher values empirically correlate with
-kernel panics later on. If `master` is above 34, close YouTube
-(Options → Close application), reopen it, wait longer this time, and
-retry from step 1.
-
 ### 2. Wait ~50 minutes
 
 The cr_ref leak dominates the runtime. The payload sender will stay
@@ -95,7 +89,7 @@ interact with the PS5 while it runs.
 ### 3. Look for completion
 
 ```
-[p2jb] stage_elfldr: daemon should be listening on :9021
+[p2jb] stage_elfldr: elfldr launched - listening on :9021
 [p2jb] === p2jb complete ===
 ```
 
@@ -183,7 +177,7 @@ along the way.
   flow; not the exploit itself (lapse exploits AIO, not `kqueueex`).
 - **Edigax** — help with the multi-core leak implementation, bringing
   the `cr_ref` leak down from ~2 hours to ~48 minutes.
-- **/home/rviju** and **Dr.Yenyen** — help running test builds on real
+- **Rviju** and **Dr.Yenyen** — help running test builds on real
   hardware during the close-KP investigation.
 - **Claude (Anthropic)** — AI assistant used throughout the port.
 
